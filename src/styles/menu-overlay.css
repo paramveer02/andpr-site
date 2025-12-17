@@ -1,0 +1,27 @@
+.menuOverlay {
+  will-change: opacity, transform;
+}
+
+.menuOverlay-link {
+  position: relative;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.menuOverlay-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -0.28em;
+  height: 1px;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: 0% 50%;
+  background: rgba(212, 175, 55, 0.55);
+  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.menuOverlay-link:hover::after,
+.menuOverlay-link:focus-visible::after {
+  transform: scaleX(1);
+}

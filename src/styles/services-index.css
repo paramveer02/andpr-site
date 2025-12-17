@@ -1,0 +1,205 @@
+.services-preview {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.04);
+  contain: layout paint;
+  box-shadow:
+    0 30px 70px rgba(15, 23, 42, 0.12),
+    0 1px 0 rgba(15, 23, 42, 0.08);
+  outline: 1px solid rgba(212, 175, 55, 0.14);
+}
+
+.services-previewLayer {
+  position: absolute;
+  inset: 0;
+  will-change: opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.services-previewLayer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: translateZ(0);
+  will-change: opacity;
+}
+
+/* ---------- ROW STABILITY (prevents hover reflow ripple) ---------- */
+.serviceRow {
+  contain: layout paint;
+}
+
+/* Title: stable ellipsis on desktop, never “jumps” */
+.serviceTitleText {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .serviceTitleText {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* ---------- ACTION AREA: ZERO LAYOUT SHIFT (VIEW <-> SELECTED) ---------- */
+.serviceAction {
+  width: var(--service-action-w, 7.5rem);
+  min-width: var(--service-action-w, 7.5rem);
+  flex: 0 0 var(--service-action-w, 7.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  overflow: visible;
+  padding-right: 0.375rem;
+}
+
+/* Container must have fixed height so absolute labels don't re-measure */
+.serviceActionLabel {
+  position: relative;
+  width: calc(100% - 2.25rem);
+  height: 1em;
+  overflow: hidden;
+  text-align: right;
+}
+
+/* Both texts occupy same box; we animate opacity + a tiny translateY */
+.serviceActionLabelText {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  opacity: 0;
+
+  transition:
+    opacity 420ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  will-change: opacity;
+}
+
+/* default state shows VIEW */
+.serviceActionLabelText--view {
+  opacity: 1;
+}
+
+/* active state shows SELECTED */
+[data-service-row][aria-current="true"] .serviceActionLabelText--view {
+  opacity: 0;
+}
+
+[data-service-row][aria-current="true"] .serviceActionLabelText--selected {
+  opacity: 1;
+}
+
+/* non-active rows show VIEW */
+[data-service-row]:not([aria-current="true"]) .serviceActionLabelText--selected {
+  opacity: 0;
+}
+
+/* ---------- GOLD INDEX MARKER (line next to number) ---------- */
+/* refined: scaleY + opacity = elegant, no jitter */
+.serviceIndexMarker {
+  opacity: 0;
+  transition: opacity 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity;
+}
+
+.serviceIndexMarker.is-active {
+  opacity: 1;
+}
+
+/* subtle hover presence without making it “snappy” */
+[data-service-row]:not([aria-current="true"]):hover .serviceIndexMarker {
+  opacity: 0.55;
+}
+
+/* ---------- MOBILE RESPONSIVE IMPROVEMENTS ---------- */
+@media (max-width: 1023px) {
+  .serviceTitleText {
+    font-size: 2.2rem;
+    line-height: 1.1;
+  }
+  
+  .serviceAction {
+    width: auto;
+    min-width: auto;
+    flex: 0 0 auto;
+    padding-right: 0;
+  }
+  
+  .serviceActionLabel {
+    display: none;
+  }
+  
+  .serviceRow {
+    padding: 1.25rem 0;
+  }
+  
+  /* Adjust the index marker position for mobile */
+  .serviceIndexMarker {
+    left: 1rem;
+    top: 1.5rem;
+    transform: translateX(0) translateY(0);
+    height: 1.5rem;
+  }
+  
+  /* Adjust the underline position for mobile */
+  [data-service-row] > span:nth-child(2) {
+    left: 4rem;
+    width: 3rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .serviceTitleText {
+    font-size: 1.8rem;
+  }
+  
+  [data-service-row] {
+    gap: 0.75rem;
+  }
+}
+
+/* ---------- PREVIEW GRAIN + LOADING SHIMMER (unchanged) ---------- */
+.services-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.28;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+.services-preview.is-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.06),
+    rgba(15, 23, 42, 0.12),
+    rgba(15, 23, 42, 0.06)
+  );
+  background-size: 200% 100%;
+  animation: servicesShimmer 1.2s ease-in-out infinite;
+  z-index: 5;
+  opacity: 0.6;
+}
+
+@keyframes servicesShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}

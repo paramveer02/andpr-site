@@ -1,0 +1,208 @@
+.contactSection {
+  position: relative;
+  overflow: hidden;
+}
+
+.contactFade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 160px;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.contactFade--top {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0));
+}
+
+.contactFade--bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0));
+}
+
+.contactHeading {
+  letter-spacing: -0.015em;
+}
+
+/* Mobile responsive heading */
+@media (max-width: 767px) {
+  .contactHeading {
+    font-size: 2.5rem !important;
+    line-height: 1.1;
+  }
+}
+
+@media (max-width: 480px) {
+  .contactHeading {
+    font-size: 2rem !important;
+  }
+}
+
+.contactSignatureWrap {
+  display: inline-flex;
+  color: var(--brand-gold);
+  align-items: center;
+  gap: 14px;
+  justify-content: center;
+}
+
+.contactRule {
+  width: 68px;
+  height: 1px;
+  background: color-mix(in srgb, var(--brand-gold) 45%, transparent); /* brand-gold-ish */
+  transform: translateY(1px);
+}
+
+/* CTA: luxury inline button */
+.contactCtaInline {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  padding: 14px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 380ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.contactCtaInline:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--brand-gold) 35%, transparent);
+  box-shadow: 0 22px 55px rgba(15, 23, 42, 0.08);
+}
+
+.contactCtaMeta {
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brand-gold); /* Golden color for email address */
+}
+
+/* Mobile responsive CTA */
+@media (max-width: 767px) {
+  .contactCtaMeta {
+    font-size: 0.7rem;
+  }
+}
+
+.contactCtaLabel {
+  color: rgba(15, 23, 42, 0.52); /* Muted color for label text */
+}
+
+/* Details */
+.contactDetailsCard {
+  margin: 0 auto;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(15, 23, 42, 0.02);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.06);
+  padding: 18px 18px 14px;
+}
+
+.contactDetailsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  padding: 6px 6px 10px;
+}
+
+@media (min-width: 640px) {
+  .contactDetailsGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+}
+
+.contactDetailsKicker {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.46em;
+  color: rgba(15, 23, 42, 0.45);
+}
+
+.contactDetailsValue {
+  margin-top: 10px;
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.62);
+}
+
+.contactDetailsFooter {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  display: flex;
+  justify-content: center;
+}
+
+.contactFooterLinks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (min-width: 640px) {
+  .contactFooterLinks {
+    flex-direction: row;
+    gap: 24px;
+  }
+}
+
+.contactMiniLink {
+  font-size: 0.72rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.55);
+  text-decoration: none;
+  transition: color 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.contactMiniLink:hover {
+  color: color-mix(in srgb, var(--brand-gold) 95%, black);
+}
+
+.contactMiniHint {
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.42);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 767px) {
+  .contactDetailsCard {
+    padding: 16px 16px 12px;
+  }
+  
+  .contactDetailsValue {
+    font-size: 0.85rem;
+  }
+  
+  .contactMiniLink {
+    font-size: 0.65rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .contactDetailsValue {
+    font-size: 0.8rem;
+  }
+  
+  .contactMiniLink {
+    font-size: 0.6rem;
+  }
+}
+
+.contactSignature {
+  color: var(--brand-gold); /* brand gold */
+}
