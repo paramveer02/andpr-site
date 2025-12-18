@@ -153,11 +153,12 @@ export default function ClientGallery() {
       const mm = gsap.matchMedia();
 
       mm.add("(min-width: 640px)", () => {
-        const getDistance = () => {
-          const total = track.scrollWidth;
-          const viewport = section.clientWidth;
-          return Math.max(0, Math.round(total - viewport));
-        };
+      const getDistance = () => {
+        const total = track.scrollWidth;
+        const viewport = section.clientWidth;
+        // Adding a small buffer to ensure the last item is fully visible
+        return Math.max(0, Math.round(total - viewport + 50));
+      };
 
         const distance = getDistance();
         if (distance < 2) return () => {};
@@ -171,7 +172,24 @@ export default function ClientGallery() {
 
         // timeline
         const tl = gsap.timeline({ defaults: { ease: "none" } });
-        tl.to(track, { x: () => -getDistance(), duration: 1 }, 0);
+
+        // Calculate positions for the slowdown effect
+      const totalDistance = distance;
+      const normalScrollEnd = totalDistance * 0.8; // Normal speed for first 80%
+      const slowScrollEnd = totalDistance;
+
+      // Normal speed scroll (first 80%)
+      tl.to(track, { 
+        x: () => -normalScrollEnd, 
+        duration: 0.8 
+      }, 0);
+      
+      // Slower speed scroll (last 20%)
+      tl.to(track, { 
+        x: () => -slowScrollEnd, 
+        duration: 0.2,
+        ease: "power1.out" // Gentle easing for the slowdown
+      }, 0.8);
 
         const trigger = ScrollTrigger.create({
           trigger: section,
@@ -179,7 +197,7 @@ export default function ClientGallery() {
           end: () => `+=${getDistance()}`,
           pin: true,
           pinSpacing: true,
-          scrub: 0.75,
+          scrub: 1,
           anticipatePin: 1,
           fastScrollEnd: true,
           invalidateOnRefresh: true,
@@ -317,7 +335,28 @@ export default function ClientGallery() {
               data-cursor-label="DRAG"
             >
               {curated.map((client, idx) => (
-                <article key={`${client.name}-${client.category}`} className="clientGallery-panel">
+                <article key={`${client.name}-${client.category}`} className="clientGallery-panel"
+                onMouseEnter={(e) => {
+                  const image = e.currentTarget.querySelector('.clientGallery-image');
+                  if (image) {
+                    gsap.to(image, {
+                      scale: 1.05,
+                      duration: 0.45,
+                      ease: "power2.out"
+                    });
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const image = e.currentTarget.querySelector('.clientGallery-image');
+                  if (image) {
+                    gsap.to(image, {
+                      scale: 1,
+                      duration: 0.35,
+                      ease: "power2.out"
+                    });
+                  }
+                }}
+                >
                   <LuxuryImage
                     src={client.image}
                     alt={`${client.name} — ${client.category}`}
