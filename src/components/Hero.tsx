@@ -1,13 +1,6 @@
 import Header from "./Header";
 import LuxuryImage from "./LuxuryImage";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import "../styles/hero.css";
@@ -16,6 +9,21 @@ import heroImage from "../assets/hero.jpg";
 
 gsap.registerPlugin(ScrollTrigger);
 
+function getPrefersReducedMotion() {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getShouldShowIntro() {
+  if (typeof window === "undefined") return false;
+  if (getPrefersReducedMotion()) return false;
+  try {
+    return !sessionStorage.getItem("andpr_intro_seen");
+  } catch {
+    return false;
+  }
+}
+
 type HeroProps = {
   menuOpen?: boolean;
   onToggleMenu?: () => void;
@@ -23,34 +31,37 @@ type HeroProps = {
 
 export default function Hero({ menuOpen = false, onToggleMenu }: HeroProps) {
   const lenis = useLenis();
+
   const heroRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const leftRef = useRef<HTMLDivElement | null>(null);
   const rightRef = useRef<HTMLDivElement | null>(null);
+
   const headlineRef = useRef<HTMLHeadingElement | null>(null);
   const subtitleRef = useRef<HTMLParagraphElement | null>(null);
+
+  const introRef = useRef<HTMLDivElement | null>(null);
+  const introTextRef = useRef<HTMLDivElement | null>(null);
+
   const heroRevealTlRef = useRef<gsap.core.Timeline | null>(null);
   const heroRevealPreparedRef = useRef(false);
   const heroRevealPlayedRef = useRef(false);
-  const introRef = useRef<HTMLDivElement | null>(null);
-  const introTextRef = useRef<HTMLDivElement | null>(null);
+
   const introTlRef = useRef<gsap.core.Timeline | null>(null);
   const introExitTlRef = useRef<gsap.core.Timeline | null>(null);
-  const introExitRequestedRef = useRef(false);
   const introDelayRef = useRef<gsap.core.Tween | null>(null);
+  const introExitRequestedRef = useRef(false);
 
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(true);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(getPrefersReducedMotion);
+  const [introMounted, setIntroMounted] = useState(getShouldShowIntro);
 
   const workTarget = "#clients";
   const [hasWorkTarget, setHasWorkTarget] = useState(false);
-  const [showIntro, setShowIntro] = useState(false);
 
+  // --- Reduced motion watcher
   useEffect(() => {
     const mql = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (!mql) {
-      setPrefersReducedMotion(false);
-      return;
-    }
+    if (!mql) return;
 
     const apply = () => setPrefersReducedMotion(mql.matches);
     apply();
@@ -58,26 +69,27 @@ export default function Hero({ menuOpen = false, onToggleMenu }: HeroProps) {
     return () => mql.removeEventListener?.("change", apply);
   }, []);
 
+  // --- Work target presence
   useEffect(() => {
     setHasWorkTarget(Boolean(document.querySelector(workTarget)));
   }, []);
 
+  // --- If reduced motion is enabled, kill intro
   useEffect(() => {
-    if (prefersReducedMotion) return;
-    try {
-      const seen = sessionStorage.getItem("andpr_intro_seen");
-      setShowIntro(!seen);
-    } catch {
-      setShowIntro(false);
-    }
+    if (!prefersReducedMotion) return;
+    setIntroMounted(false);
   }, [prefersReducedMotion]);
 
+  // =========================
+  // HERO REVEAL (headline lines)
+  // =========================
   const prepareHeroReveal = useCallback(() => {
     const hero = heroRef.current;
     const left = leftRef.current;
     const right = rightRef.current;
     const headline = headlineRef.current;
     const subtitle = subtitleRef.current;
+
     if (!hero || !left || !right || !headline || !subtitle) return;
     if (prefersReducedMotion) return;
     if (heroRevealPreparedRef.current) return;
@@ -87,12 +99,8 @@ export default function Hero({ menuOpen = false, onToggleMenu }: HeroProps) {
     const image = left.querySelector("img");
     const headlineLines = headline.querySelectorAll("[data-hero-headline-line]");
 
-    // StrictMode/rehydration safety: prepare once, and never re-apply hidden states after content is visible.
     const ctx = gsap.context(() => {
       gsap.killTweensOf([headlineLines, subtitle, headline, image].filter(Boolean));
-
-      gsap.set(hero, { willChange: "transform" });
-      gsap.set([left, right, headline, subtitle], { willChange: "transform" });
 
       if (image) gsap.set(image, { willChange: "transform", scale: 1.035 });
 
@@ -107,22 +115,11 @@ export default function Hero({ menuOpen = false, onToggleMenu }: HeroProps) {
 
       heroRevealTlRef.current
         .to(headlineLines, { yPercent: 0, stagger: 0.09, duration: 1.2 }, 0.18)
-        .to(
-          subtitle,
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.9,
-            ease: "power2.out",
-          },
-          0.55,
-        );
+        .to(subtitle, { y: 0, opacity: 1, duration: 0.9, ease: "power2.out" }, 0.55);
 
       if (image) {
         heroRevealTlRef.current.to(image, { scale: 1, duration: 1.7, ease: "expo.out" }, 0.1);
       }
-
-      heroRevealTlRef.current.set([headline, subtitle], { clearProps: "willChange" }, ">");
     }, hero);
 
     return () => ctx.revert();
@@ -131,97 +128,152 @@ export default function Hero({ menuOpen = false, onToggleMenu }: HeroProps) {
   const playHeroReveal = useCallback(() => {
     if (prefersReducedMotion) return;
     if (heroRevealPlayedRef.current) return;
+
     if (!heroRevealPreparedRef.current) prepareHeroReveal();
     if (!heroRevealTlRef.current) return;
+
     heroRevealPlayedRef.current = true;
     heroRevealTlRef.current.play(0);
   }, [prefersReducedMotion, prepareHeroReveal]);
 
-  const playIntroExit = useCallback((variant: "normal" | "fast" = "normal") => {
+  // =========================
+  // INTRO (simple + elegant)
+  // =========================
+  const playIntroExit = useCallback(
+    (variant: "normal" | "fast" = "normal") => {
+      const intro = introRef.current;
+      const introText = introTextRef.current;
+      if (!intro || !introText) return;
+
+      if (introExitRequestedRef.current) return;
+      introExitRequestedRef.current = true;
+
+      introDelayRef.current?.kill();
+      introDelayRef.current = null;
+
+      introTlRef.current?.kill();
+      introTlRef.current = null;
+
+      // reveal hero as soon as intro begins exiting
+      playHeroReveal();
+
+      const isFast = variant === "fast";
+      const dText = isFast ? 0.35 : 0.75;
+      const dOverlay = isFast ? 0.35 : 0.65;
+
+      introExitTlRef.current?.kill();
+      introExitTlRef.current = gsap.timeline({
+        defaults: { overwrite: true },
+        onComplete: () => {
+          try {
+            sessionStorage.setItem("andpr_intro_seen", "1");
+          } catch {}
+
+          setIntroMounted(false);
+
+          if (lenis && typeof (lenis as any).start === "function") (lenis as any).start();
+
+          introExitRequestedRef.current = false;
+          introExitTlRef.current = null;
+        },
+      });
+
+      introExitTlRef.current
+        .to(introText, {
+          opacity: 0,
+          y: -6,
+          filter: "blur(8px)",
+          duration: dText,
+          ease: "power3.inOut",
+        })
+        .to(
+          intro,
+          {
+            autoAlpha: 0,
+            duration: dOverlay,
+            ease: "power2.inOut",
+          },
+          isFast ? 0.06 : 0.12,
+        );
+    },
+    [lenis, playHeroReveal, playHeroReveal],
+  );
+
+  // Intro enter animation (only intro text)
+  useLayoutEffect(() => {
+    if (!introMounted || prefersReducedMotion) return;
+
     const intro = introRef.current;
     const introText = introTextRef.current;
-    const content = contentRef.current;
-    if (!intro || !introText || !content) return;
+    if (!intro || !introText) return;
 
-    if (introExitRequestedRef.current) return;
-    introExitRequestedRef.current = true;
+    if (lenis && typeof (lenis as any).stop === "function") (lenis as any).stop();
 
-    playHeroReveal();
-
-    introDelayRef.current?.kill();
-    introDelayRef.current = null;
+    introExitRequestedRef.current = false;
 
     introTlRef.current?.kill();
-    introTlRef.current = null;
-
     introExitTlRef.current?.kill();
-    introExitTlRef.current = null;
+    introDelayRef.current?.kill();
 
-    const isFast = variant === "fast";
-    const exitTextDuration = isFast ? 0.45 : 0.8;
-    const exitOverlayDuration = isFast ? 0.45 : 0.7;
-    const contentDuration = isFast ? 0.55 : 0.9;
-
-    const tl = gsap.timeline({
-      defaults: { overwrite: true },
-      onComplete: () => {
-        try {
-          sessionStorage.setItem("andpr_intro_seen", "1");
-        } catch {}
-        setShowIntro(false);
-
-        if (lenis && typeof (lenis as any).start === "function") {
-          (lenis as any).start();
-        }
-
-        ScrollTrigger.refresh();
-
-        gsap.set(intro, { clearProps: "all" });
-        gsap.set(introText, { clearProps: "all" });
-        gsap.set(content, { clearProps: "all" });
-
-        introExitTlRef.current = null;
-      },
+    gsap.set(intro, { autoAlpha: 1 });
+    gsap.set(introText, {
+      opacity: 0,
+      y: 10,
+      filter: "blur(10px)",
+      willChange: "transform, opacity, filter",
     });
 
-    tl.to(
-      introText,
-      {
-        opacity: 0,
-        y: -6,
-        filter: "blur(6px)",
-        duration: exitTextDuration,
-        ease: "power3.inOut",
-      },
-      0,
-    )
-      .to(
-        introText,
-        {
-          scale: 0.992,
-          duration: exitTextDuration,
-          ease: "power3.inOut",
-        },
-        0,
-      )
-      .to(
-        intro,
-        { autoAlpha: 0, duration: exitOverlayDuration, ease: "power3.inOut" },
-        isFast ? 0.05 : 0.15,
-      )
-      .to(
-        content,
-        { autoAlpha: 1, y: 0, duration: contentDuration, ease: "power3.out" },
-        isFast ? 0 : 0.1,
-      );
+    const tl = gsap.timeline({ defaults: { overwrite: true } });
+    tl.to(introText, {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      duration: 1.05,
+      ease: "power3.out",
+    });
 
-    introExitTlRef.current = tl;
-  }, [lenis, playHeroReveal]);
+    // auto-exit after a moment (optional)
+    introDelayRef.current = gsap.delayedCall(1.7, () => playIntroExit("normal"));
+
+    introTlRef.current = tl;
+
+    return () => {
+      tl.kill();
+      introDelayRef.current?.kill();
+    };
+  }, [introMounted, prefersReducedMotion, lenis, playIntroExit]);
+
+  // Exit intro on scroll/touch/keys
+  useEffect(() => {
+    if (!introMounted) return;
+
+    const onWheel = () => playIntroExit("fast");
+    const onTouchStart = () => playIntroExit("fast");
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") playIntroExit("fast");
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [introMounted, playIntroExit]);
+
+  // Prepare reveal early; play only when intro is gone
+  useLayoutEffect(() => {
+    if (prefersReducedMotion) return;
+    prepareHeroReveal();
+    if (!introMounted) playHeroReveal();
+  }, [prefersReducedMotion, introMounted, prepareHeroReveal, playHeroReveal]);
 
   const handleWorkClick = useMemo(() => {
     return (e: React.MouseEvent<HTMLAnchorElement>) => {
       e.preventDefault();
-
       if (!hasWorkTarget) return;
 
       if (lenis && typeof (lenis as any).scrollTo === "function") {
@@ -237,121 +289,34 @@ export default function Hero({ menuOpen = false, onToggleMenu }: HeroProps) {
     };
   }, [hasWorkTarget, lenis]);
 
-  useLayoutEffect(() => {
-    const hero = heroRef.current;
-    const intro = introRef.current;
-    const introText = introTextRef.current;
-    const content = contentRef.current;
-    if (!hero || !content || !intro || !introText) return;
-
-    if (!showIntro || prefersReducedMotion) return;
-
-    const ctx = gsap.context(() => {
-      introExitRequestedRef.current = false;
-      introDelayRef.current?.kill();
-      introDelayRef.current = null;
-
-      gsap.set(intro, { autoAlpha: 1 });
-      gsap.set(content, { autoAlpha: 0, y: 8, willChange: "transform, opacity" });
-      gsap.set(introText, {
-        opacity: 0,
-        y: 10,
-        filter: "blur(10px)",
-        willChange: "transform, opacity, filter",
-      });
-
-      if (lenis && typeof (lenis as any).stop === "function") {
-        (lenis as any).stop();
-      }
-
-      const tl = gsap.timeline({ defaults: { overwrite: true } });
-      tl.to(
-        introText,
-        {
-          opacity: 1,
-          y: 0,
-          filter: "blur(0px)",
-          duration: 1.05,
-          ease: "power3.out",
-        },
-        0.2,
-      ).add(() => {
-        introDelayRef.current?.kill();
-        introDelayRef.current = gsap.delayedCall(1.4, playIntroExit);
-      });
-
-      introTlRef.current = tl;
-    }, intro);
-
-    return () => {
-      introTlRef.current?.kill();
-      introTlRef.current = null;
-      introDelayRef.current?.kill();
-      introDelayRef.current = null;
-      introExitTlRef.current?.kill();
-      introExitTlRef.current = null;
-      if (lenis && typeof (lenis as any).start === "function") {
-        (lenis as any).start();
-      }
-      ctx.revert();
-    };
-  }, [showIntro, prefersReducedMotion, lenis, playIntroExit]);
-
-  useEffect(() => {
-    if (!showIntro) return;
-
-    const onWheel = () => playIntroExit("fast");
-    const onTouchStart = () => playIntroExit("fast");
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-        playIntroExit("fast");
-      }
-    };
-
-    window.addEventListener("wheel", onWheel, { passive: true });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [showIntro, playIntroExit]);
-
-  useLayoutEffect(() => {
-    if (prefersReducedMotion) return;
-    // Prepare early (even while intro is running) so the hero never becomes visible with "reset" transforms.
-    prepareHeroReveal();
-    if (!showIntro) playHeroReveal();
-  }, [prefersReducedMotion, showIntro, prepareHeroReveal, playHeroReveal]);
-
   return (
     <section ref={heroRef} className="heroShell relative min-h-[100svh] overflow-hidden bg-brand-navy">
-      {showIntro ? (
+      {introMounted ? (
         <div
           ref={introRef}
           className="heroIntro fixed inset-0 z-[90] grid place-items-center"
-          onClick={() => {
-            playIntroExit();
-          }}
+          onClick={() => playIntroExit("fast")}
           role="presentation"
         >
-          <div ref={introTextRef} className="relative z-10 text-center">
-            <div
-              style={{ fontFamily: "var(--font-serif)" }}
-              className="select-none text-3xl tracking-[0.32em] text-brand-white sm:text-4xl"
-            >
+          <div ref={introTextRef} className="introSimple text-center">
+
+            <div className="introBrand" style={{ fontFamily: "var(--font-serif)" }}>
               AND PR
             </div>
-            <div className="mt-4 text-[0.7rem] uppercase tracking-[0.55em] text-brand-gold/70">
-              Luxury Brand Consultancy
-            </div>
+
+            <div className="introSub">Luxury Brand Consultancy</div>
+
           </div>
         </div>
       ) : null}
 
-      <div ref={contentRef} className="relative z-10">
+      <div
+        ref={contentRef}
+        className={[
+          "relative z-10 transition-opacity duration-300",
+          introMounted ? "opacity-0 pointer-events-none" : "opacity-100",
+        ].join(" ")}
+      >
         <Header menuOpen={menuOpen} onToggleMenu={onToggleMenu} />
 
         <div className="grid min-h-[100svh] grid-cols-1 lg:grid-cols-2">
@@ -377,39 +342,30 @@ export default function Hero({ menuOpen = false, onToggleMenu }: HeroProps) {
 
           <div ref={rightRef} className="heroPanel relative flex items-center bg-brand-navy">
             <div className="mx-auto w-full max-w-[44rem] px-6 pb-28 pt-16 lg:px-12 lg:pb-16 lg:pt-24">
-              <p
-                ref={subtitleRef}
-                className="text-[0.7rem] uppercase tracking-[0.52em] text-brand-gold/70"
-              >
+              <p ref={subtitleRef} className="text-[0.7rem] uppercase tracking-[0.52em] text-brand-gold/70">
                 COUTURE • CULTURE • COMMUNICATIONS
               </p>
 
-            <h1
-              ref={headlineRef}
-              className="mt-10 text-balance leading-[0.92] tracking-[-0.01em] text-brand-white"
-              style={{ fontFamily: "var(--font-serif)" }}
-            >
-              <span className="hero-reveal block">
-                <span
-                  data-hero-headline-line
-                  className="block text-[3.1rem] sm:text-[4.05rem] lg:text-[5.25rem]"
-                >
-                  ARCHITECTS OF
+              <h1
+                ref={headlineRef}
+                className="mt-10 text-balance leading-[0.92] tracking-[-0.01em] text-brand-white"
+                style={{ fontFamily: "var(--font-serif)" }}
+              >
+                <span className="hero-reveal block">
+                  <span data-hero-headline-line className="block text-[3.1rem] sm:text-[4.05rem] lg:text-[5.25rem]">
+                    ARCHITECTS OF
+                  </span>
                 </span>
-              </span>
-              <span className="hero-reveal block">
-                <span
-                  data-hero-headline-line
-                  className="block text-[3.1rem] sm:text-[4.05rem] lg:text-[5.25rem]"
-                >
-                  INFLUENCE
+                <span className="hero-reveal block">
+                  <span data-hero-headline-line className="block text-[3.1rem] sm:text-[4.05rem] lg:text-[5.25rem]">
+                    INFLUENCE
+                  </span>
                 </span>
-              </span>
-            </h1>
+              </h1>
 
-            <p className="mt-8 max-w-xl text-pretty text-base leading-relaxed text-white/65 sm:text-lg">
-              Shaping relevance, presence, and cultural authority.
-            </p>
+              <p className="mt-8 max-w-xl text-pretty text-base leading-relaxed text-white/65 sm:text-lg">
+                Shaping relevance, presence, and cultural authority.
+              </p>
 
               <div className="mt-12 flex flex-wrap items-center gap-7">
                 <a
@@ -421,37 +377,21 @@ export default function Hero({ menuOpen = false, onToggleMenu }: HeroProps) {
                           e.preventDefault();
                         }
                   }
-                  data-cursor={hasWorkTarget ? "link" : undefined}
                   aria-disabled={hasWorkTarget ? undefined : "true"}
-                  className={[
-                    "heroCta text-xs uppercase tracking-[0.35em]",
-                    hasWorkTarget ? "" : "heroCta--disabled",
-                  ].join(" ")}
+                  className={["heroCta text-xs uppercase tracking-[0.35em]", hasWorkTarget ? "" : "heroCta--disabled"].join(
+                    " ",
+                  )}
                 >
                   Selected Work
                 </a>
 
-                <a
-                  href="mailto:hello@andpr.com"
-                  data-cursor="link"
-                  data-cursor-label="OPEN"
-                  className="heroCta text-xs uppercase tracking-[0.35em]"
-                >
+                <a href="mailto:hello@andpr.com" className="heroCta text-xs uppercase tracking-[0.35em]">
                   Start a Conversation
                 </a>
               </div>
             </div>
           </div>
         </div>
-
-      {/* <div className="pointer-events-none absolute inset-x-0 bottom-8 z-40 flex justify-center lg:bottom-10">
-        <div
-          ref={showreelRef}
-          className="pointer-events-auto translate-y-0 lg:translate-x-0 lg:translate-y-0 lg:[transform:translateX(-50%)] lg:relative lg:left-1/2"
-        >
-          <PlayShowreelButton />
-        </div>
-      </div> */}
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 hidden h-24 lg:block">
           <div className="h-full bg-gradient-to-t from-black/20 via-transparent to-transparent" />

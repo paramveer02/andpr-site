@@ -12,6 +12,11 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 gsap.registerPlugin(ScrollTrigger);
 
+function getPrefersReducedMotion() {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 declare global {
   interface Window {
     __lenis?: Lenis;
@@ -26,18 +31,45 @@ export function useLenis() {
 
 type SmoothScrollProviderProps = PropsWithChildren<{
   enabled?: boolean;
+  respectReducedMotion?: boolean;
 }>;
 
 export default function SmoothScrollProvider({
   enabled = true,
+  respectReducedMotion = true,
   children,
 }: SmoothScrollProviderProps) {
   const [lenisInstance, setLenisInstance] = useState<Lenis | null>(null);
   const lenisRef = useRef<Lenis | null>(null);
   const tickerFnRef = useRef<((time: number) => void) | null>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    getPrefersReducedMotion,
+  );
 
   useEffect(() => {
-    if (!enabled) return;
+    if (typeof window === "undefined" || !window.matchMedia) return;
+
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setPrefersReducedMotion(mql.matches);
+
+    onChange();
+
+    if ("addEventListener" in mql) mql.addEventListener("change", onChange);
+    else mql.addListener(onChange);
+
+    return () => {
+      if ("removeEventListener" in mql) mql.removeEventListener("change", onChange);
+      else mql.removeListener(onChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const shouldEnableLenis =
+      enabled && (!respectReducedMotion || !prefersReducedMotion);
+
+    // Respect OS-level reduced motion to avoid forcing smooth scrolling (opt-out
+    // via `respectReducedMotion={false}` for specific pages).
+    if (!shouldEnableLenis) return;
     if (lenisRef.current) return;
 
     const lenis = new Lenis({
@@ -92,7 +124,7 @@ export default function SmoothScrollProvider({
       if (window.__lenis === lenis) delete window.__lenis;
       root.classList.remove("lenis");
     };
-  }, [enabled]);
+  }, [enabled, prefersReducedMotion, respectReducedMotion]);
 
   return (
     <LenisContext.Provider value={lenisInstance}>{children}</LenisContext.Provider>
