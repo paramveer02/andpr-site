@@ -434,18 +434,19 @@ export default function ServicesIndex() {
             >
               <div className="aspect-[4/5] w-full" />
 
-              {services.map((service, idx) => (
-                <div key={service.id} data-service-layer className="services-previewLayer" aria-hidden="true">
-                  <LuxuryImage
-                    src={service.imageSrc}
-                    alt=""
-                    loading={idx < 2 ? "eager" : "lazy"}
-                    decoding="async"
-                    referrerPolicy="no-referrer"
-                    fallbackLabel={service.title}
-                  />
-                </div>
-              ))}
+        {services.map((service, idx) => (
+          <div key={service.id} data-service-layer className="services-previewLayer" aria-hidden="true">
+            <LuxuryImage
+              src={service.imageSrc}
+              alt=""
+              loading={idx < 2 ? "eager" : "lazy"}
+              fetchPriority={idx === 0 ? "high" : idx < 2 ? "low" : "auto"}
+              decoding="async"
+              referrerPolicy="no-referrer"
+              fallbackLabel={service.title}
+            />
+          </div>
+))}
 
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
             </div>

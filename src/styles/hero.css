@@ -50,8 +50,8 @@
 
 .heroMediaOverlay {
   background:
-    radial-gradient(820px 620px at 30% 32%, rgba(15, 23, 42, 0.06) 0%, rgba(15, 23, 42, 0) 60%),
-    linear-gradient(to right, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.12) 48%, rgba(15, 23, 42, 0) 75%);
+    radial-gradient(820px 620px at 30% 32%, rgba(15, 23, 42, 0.15) 0%, rgba(15, 23, 42, 0) 60%),
+    linear-gradient(to right, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.25) 48%, rgba(15, 23, 42, 0) 75%);
 }
 
 .heroImage {
