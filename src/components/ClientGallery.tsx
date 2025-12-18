@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -54,9 +56,9 @@ const clients: ClientCard[] = [
 export default function ClientGallery() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
-
-  const preloadCacheRef = useRef<Set<string>>(new Set());
   const [imagesReady, setImagesReady] = useState(false);
+  const [showPrevButton, setShowPrevButton] = useState(false);
+  const [showNextButton, setShowNextButton] = useState(true);
 
   const prefersReducedMotion = useMemo(() => {
     if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -65,156 +67,86 @@ export default function ClientGallery() {
 
   const curated = useMemo(() => clients.slice(0, 5), []);
 
-  // --- Preload images (progressive, then full when near viewport)
+  // --- Preload images
   useEffect(() => {
     if (typeof window === "undefined" || typeof Image === "undefined") return;
-
     const preload = (urls: string[]) => {
       const tasks: Array<Promise<void>> = [];
-
       urls.forEach((url) => {
-        if (!url) return;
-        if (preloadCacheRef.current.has(url)) return;
-        preloadCacheRef.current.add(url);
-
         const img = new Image();
-        img.decoding = "async";
-        img.referrerPolicy = "no-referrer";
-
-        const task = new Promise<void>((resolve) => {
-          const done = () => resolve();
-          img.onload = done;
-          img.onerror = done;
-        }).then(async () => {
-          try {
-            // decode helps reduce flicker on paint
-            if (typeof (img as any).decode === "function") await (img as any).decode();
-          } catch {}
-        });
-
-        tasks.push(task);
         img.src = url;
       });
-
       return Promise.allSettled(tasks).then(() => undefined);
     };
-
-    // quick warmup (first two)
     preload(curated.slice(0, 2).map((c) => c.image));
-
-    const section = sectionRef.current;
-    if (!section || typeof IntersectionObserver === "undefined") {
-      // fallback
-      const t = window.setTimeout(() => setImagesReady(true), 2500);
-      return () => window.clearTimeout(t);
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (!entry?.isIntersecting) return;
-        preload(curated.map((c) => c.image)).then(() => setImagesReady(true));
-        observer.disconnect();
-      },
-      { root: null, rootMargin: "900px 0px", threshold: 0.01 },
-    );
-
-    observer.observe(section);
-
-    // softer fallback (less likely to refresh mid-paint)
-    const fallback = window.setTimeout(() => setImagesReady(true), 2500);
-
-    return () => {
-      observer.disconnect();
-      window.clearTimeout(fallback);
-    };
+    setImagesReady(true);
   }, [curated]);
 
-  // refresh AFTER images are ready (next frame)
+  // --- Track scroll position (Mobile Only)
   useEffect(() => {
-    if (prefersReducedMotion) return;
-    if (!imagesReady) return;
-    const id = window.requestAnimationFrame(() => {
-      ScrollTrigger.refresh();
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, [imagesReady, prefersReducedMotion]);
+    const track = trackRef.current;
+    if (!track) return;
 
-  // --- Horizontal pinned scroll
+    const handleScroll = () => {
+      if (window.innerWidth >= 1024) return; // Don't run logic on desktop
+      const { scrollLeft, scrollWidth, clientWidth } = track;
+      const maxScroll = scrollWidth - clientWidth - 5;
+      setShowPrevButton(scrollLeft > 5);
+      setShowNextButton(scrollLeft < maxScroll);
+    };
+
+    track.addEventListener('scroll', handleScroll);
+    window.addEventListener('resize', handleScroll);
+    handleScroll();
+
+    return () => {
+      track.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, []);
+
+  // --- Horizontal pinned scroll (Desktop Only)
   useLayoutEffect(() => {
     const section = sectionRef.current;
     const track = trackRef.current;
     if (!section || !track) return;
-
     if (prefersReducedMotion) return;
-    if (!imagesReady) return;
 
     const ctx = gsap.context(() => {
       const mm = gsap.matchMedia();
 
-      mm.add("(min-width: 640px)", () => {
-      const getDistance = () => {
-        const total = track.scrollWidth;
-        const viewport = section.clientWidth;
-        // Adding a small buffer to ensure the last item is fully visible
-        return Math.max(0, Math.round(total - viewport + 50));
-      };
-
-        const distance = getDistance();
-        if (distance < 2) return () => {};
-
-        // baseline state
-        gsap.set(track, { x: 0, willChange: "transform", force3D: true });
+      // Desktop: Pinned Scroll (Min Width 1024px)
+      mm.add("(min-width: 1024px)", () => {
         
-        // Set willChange on panels for better performance
-        const panels = gsap.utils.toArray<HTMLElement>(track.querySelectorAll(".clientGallery-panel"));
-        gsap.set(panels, { willChange: "transform", force3D: true });
+        // FIX 1: Robust Distance Calculation
+        // We calculate the total width of the track minus the viewport width.
+        // We add a small buffer (+100px) to ensure the last item clears the edge.
+        const getDistance = () => {
+          return -(track.scrollWidth - window.innerWidth + 100);
+        };
 
-        // timeline
+        gsap.set(track, { x: 0, willChange: "transform", force3D: true });
+
         const tl = gsap.timeline({ defaults: { ease: "none" } });
+        
+        tl.to(track, { 
+            x: getDistance, 
+            duration: 1 
+        });
 
-        // Calculate positions for the slowdown effect
-      const totalDistance = distance;
-      const normalScrollEnd = totalDistance * 0.8; // Normal speed for first 80%
-      const slowScrollEnd = totalDistance;
-
-      // Normal speed scroll (first 80%)
-      tl.to(track, { 
-        x: () => -normalScrollEnd, 
-        duration: 0.8 
-      }, 0);
-      
-      // Slower speed scroll (last 20%)
-      tl.to(track, { 
-        x: () => -slowScrollEnd, 
-        duration: 0.2,
-        ease: "power1.out" // Gentle easing for the slowdown
-      }, 0.8);
-
-        const trigger = ScrollTrigger.create({
+        ScrollTrigger.create({
           trigger: section,
           start: "top top",
-          end: () => `+=${getDistance()}`,
+          // FIX 2: Increased Scroll Distance (500%)
+          // This makes the scroll feel "Calm" and "Heavy"
+          end: "+=500%", 
           pin: true,
           pinSpacing: true,
-          scrub: 1,
+          scrub: 1.5, // FIX 3: Increased Scrub for "Inertia" feel
           anticipatePin: 1,
-          fastScrollEnd: true,
           invalidateOnRefresh: true,
           animation: tl,
         });
-
-        return () => {
-          trigger.kill();
-          tl.kill();
-        };
-      });
-      
-      // Mobile-specific handling
-      mm.add("(max-width: 639px)", () => {
-        // On mobile, disable the complex horizontal scroll and use vertical stacking
-        // This ensures better performance and usability on small screens
-        return () => {}; // Cleanup function
       });
 
       return () => mm.revert();
@@ -223,8 +155,23 @@ export default function ClientGallery() {
     return () => ctx.revert();
   }, [prefersReducedMotion, imagesReady]);
 
+  // --- Button Handlers (Mobile Only)
+  const handleScroll = (direction: "left" | "right") => {
+    if (trackRef.current) {
+      const panel = trackRef.current.querySelector('.clientGallery-panel');
+      const panelWidth = panel ? panel.clientWidth : window.innerWidth * 0.85;
+      const gap = 16; 
+      const scrollAmount = panelWidth + gap;
+
+      trackRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
   return (
-    <section ref={sectionRef} id="clients" className="bg-brand-navy text-brand-white">
+    <section ref={sectionRef} id="clients" className="bg-brand-navy text-brand-white relative">
       <div className="mx-auto flex h-[100svh] max-w-7xl flex-col px-6 py-10 lg:px-12">
         <div className="pt-2">
           <p className="text-[0.7rem] uppercase tracking-[0.55em] text-brand-gold/70">
@@ -234,100 +181,54 @@ export default function ClientGallery() {
 
         {prefersReducedMotion ? (
           <div className="mt-10 space-y-10 pb-12">
-            {curated.map((client, idx) => (
+            {curated.map((client) => (
               <article key={`${client.name}-${client.category}`} className="clientGallery-stackPanel">
-                <div
-                  className={[
-                    "relative",
-                    client.aspect === "portrait" ? "aspect-[3/4]" : "aspect-[4/3]",
-                  ].join(" ")}
-                >
+                <div className={["relative", client.aspect === "portrait" ? "aspect-[3/4]" : "aspect-[4/3]"].join(" ")}>
                   <LuxuryImage
                     src={client.image}
                     alt={`${client.name} — ${client.category}`}
                     className="clientGallery-image"
-                    loading={idx < 2 ? "eager" : "lazy"}
-                    fetchPriority={idx === 0 ? "high" : "auto"}
-                    decoding="async"
-                    referrerPolicy="no-referrer"
-                    fallbackLabel={client.name}
                   />
                 </div>
-
                 <div className="clientGallery-caption p-7 lg:p-10">
-                  <h3
-                    className="text-3xl leading-none text-brand-white lg:text-4xl"
-                    style={{ fontFamily: "var(--font-serif)" }}
-                  >
+                  <h3 className="text-3xl leading-none text-brand-white lg:text-4xl" style={{ fontFamily: "var(--font-serif)" }}>
                     {client.name}
                   </h3>
-                  <p className="mt-3 text-[0.7rem] uppercase tracking-[0.5em] text-brand-gold">
-                    {client.category}
-                  </p>
                 </div>
               </article>
             ))}
           </div>
         ) : (
           <div className="relative mt-8 flex-1 overflow-hidden">
-            {/* Previous Button */}
-            <div className="clientGallery-nav clientGallery-nav--prev">
+            
+            {/* --- NAVIGATION CONTROLS (Mobile Only) --- */}
+            <div className="clientGallery-controls">
               <button 
                 type="button" 
-                className="clientGallery-navButton"
+                className={`clientGallery-navButton ${!showPrevButton ? 'opacity-0 pointer-events-none' : ''}`}
                 aria-label="Previous client"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (trackRef.current) {
-                    // Check if we're on mobile (where horizontal scroll is disabled)
-                    if (window.innerWidth <= 639) {
-                      // On mobile, we could implement a different behavior if needed
-                      // For now, we'll just prevent the default action
-                      return;
-                    }
-                    
-                    trackRef.current.scrollBy({
-                      left: -trackRef.current.clientWidth * 0.8,
-                      behavior: "smooth",
-                    });
-                  }
+                  handleScroll("left");
                 }}
               >
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
-            </div>
-            
-            {/* Next Button */}
-            <div className="clientGallery-nav clientGallery-nav--next">
+
               <button 
                 type="button" 
-                className="clientGallery-navButton"
+                className={`clientGallery-navButton ${!showNextButton ? 'opacity-0 pointer-events-none' : ''}`}
                 aria-label="Next client"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (trackRef.current) {
-                    // Check if we're on mobile (where horizontal scroll is disabled)
-                    if (window.innerWidth <= 639) {
-                      // On mobile, we could implement a different behavior if needed
-                      // For now, we'll just prevent the default action
-                      return;
-                    }
-                    
-                    trackRef.current.scrollBy({
-                      left: trackRef.current.clientWidth * 0.8,
-                      behavior: "smooth",
-                    });
-                  }
+                  handleScroll("right");
                 }}
               >
-                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+                <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
               </button>
             </div>
 
+            {/* Track */}
             <div
               ref={trackRef}
               className="clientGallery-track"
@@ -335,27 +236,17 @@ export default function ClientGallery() {
               data-cursor-label="DRAG"
             >
               {curated.map((client, idx) => (
-                <article key={`${client.name}-${client.category}`} className="clientGallery-panel"
-                onMouseEnter={(e) => {
-                  const image = e.currentTarget.querySelector('.clientGallery-image');
-                  if (image) {
-                    gsap.to(image, {
-                      scale: 1.05,
-                      duration: 0.45,
-                      ease: "power2.out"
-                    });
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  const image = e.currentTarget.querySelector('.clientGallery-image');
-                  if (image) {
-                    gsap.to(image, {
-                      scale: 1,
-                      duration: 0.35,
-                      ease: "power2.out"
-                    });
-                  }
-                }}
+                <article 
+                  key={`${client.name}-${client.category}`} 
+                  className="clientGallery-panel"
+                  onMouseEnter={(e) => {
+                    const image = e.currentTarget.querySelector('.clientGallery-image');
+                    if (image) gsap.to(image, { scale: 1.05, duration: 0.45, ease: "power2.out" });
+                  }}
+                  onMouseLeave={(e) => {
+                    const image = e.currentTarget.querySelector('.clientGallery-image');
+                    if (image) gsap.to(image, { scale: 1, duration: 0.35, ease: "power2.out" });
+                  }}
                 >
                   <LuxuryImage
                     src={client.image}
