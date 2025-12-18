@@ -127,9 +127,16 @@
   top: 50%;
   transform: translateY(-50%);
   z-index: 10;
-  display: flex;
+  display: none; /* Hidden by default on large screens */
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* Show navigation buttons only on smaller screens */
+@media (max-width: 1023px) {
+  .clientGallery-nav {
+    display: flex;
+  }
 }
 
 .clientGallery-nav--prev {
